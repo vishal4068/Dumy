@@ -4,36 +4,49 @@ Sub ExtractTrackedChangesToPDF()
     Dim pageNum As Long
     Dim tempDoc As Document
     Dim saveFolder As String
-    Dim outputFileName As String
+    Dim lastPageNum As Long
 
+    ' Get the active document
     Set oDoc = ActiveDocument
     saveFolder = Left(oDoc.FullName, InStrRev(oDoc.FullName, "\"))
 
+    ' Determine the last page number of the document
+    lastPageNum = oDoc.ComputeStatistics(wdStatisticPages)
+
+    ' Loop through each revision in the document
     For Each oRevision In oDoc.Revisions
+        ' Check if the revision is an insertion or deletion (tracked change)
         If oRevision.Type = wdRevisionInsert Or oRevision.Type = wdRevisionDelete Then
-            ' Get the page number of the tracked change
+            ' Get the page number where the tracked change is located
             pageNum = oRevision.Range.Information(wdActiveEndPageNumber)
 
-            ' Create a new document to hold the extracted content
+            ' Create a new document to store the extracted content
             Set tempDoc = Documents.Add
 
-            ' Copy the revision's range to the new document
-            oRevision.Range.Copy
-            tempDoc.Range.Paste
+            ' Copy the content of the page with tracked changes to the new document
+            If pageNum = lastPageNum Then
+                ' If the revision is on the last page, copy until the end of the document
+                oDoc.Range(Start:=oDoc.Range.GoTo(What:=wdGoToPage, Which:=wdGoToAbsolute, Count:=pageNum).Start, _
+                           End:=oDoc.Content.End).Copy
+            Else
+                ' Copy content from the specified page to the start of the next page
+                oDoc.Range(Start:=oDoc.Range.GoTo(What:=wdGoToPage, Which:=wdGoToAbsolute, Count:=pageNum).Start, _
+                           End:=oDoc.Range.GoTo(What:=wdGoToPage, Which:=wdGoToAbsolute, Count:=pageNum + 1).Start).Copy
+            End If
 
-            ' Define the output PDF filename based on the tracked change
-            outputFileName = saveFolder & "Page_" & pageNum & "_TrackedChanges.pdf"
+            ' Paste the copied content into the new document with formatting
+            tempDoc.Range.PasteAndFormat (wdFormatOriginalFormatting)
 
-            ' Save the new document as PDF
-            tempDoc.ExportAsFixedFormat OutputFileName:=outputFileName, ExportFormat:=wdExportFormatPDF
+            ' Save the new document as a PDF file with a meaningful name in the same folder
+            tempDoc.ExportAsFixedFormat OutputFileName:=saveFolder & "Page_" & pageNum & "_TrackedChanges.pdf", _
+                ExportFormat:=wdExportFormatPDF
 
-            ' Close the temporary document without saving changes
+            ' Close the temporary document without saving changes (changes are already saved in the PDF)
             tempDoc.Close SaveChanges:=wdDoNotSaveChanges
         End If
     Next oRevision
 
-    ' Clean up - release objects
+    ' Clean up - release object references
     Set oDoc = Nothing
     Set tempDoc = Nothing
 End Sub
-
