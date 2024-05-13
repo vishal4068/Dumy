@@ -1,0 +1,39 @@
+Sub ExtractTrackedChangesToPDF()
+    Dim oDoc As Document
+    Dim oRevision As Revision
+    Dim pageNum As Long
+    Dim tempDoc As Document
+    Dim saveFolder As String
+    Dim outputFileName As String
+
+    Set oDoc = ActiveDocument
+    saveFolder = Left(oDoc.FullName, InStrRev(oDoc.FullName, "\"))
+
+    For Each oRevision In oDoc.Revisions
+        If oRevision.Type = wdRevisionInsert Or oRevision.Type = wdRevisionDelete Then
+            ' Get the page number of the tracked change
+            pageNum = oRevision.Range.Information(wdActiveEndPageNumber)
+
+            ' Create a new document to hold the extracted content
+            Set tempDoc = Documents.Add
+
+            ' Copy the revision's range to the new document
+            oRevision.Range.Copy
+            tempDoc.Range.Paste
+
+            ' Define the output PDF filename based on the tracked change
+            outputFileName = saveFolder & "Page_" & pageNum & "_TrackedChanges.pdf"
+
+            ' Save the new document as PDF
+            tempDoc.ExportAsFixedFormat OutputFileName:=outputFileName, ExportFormat:=wdExportFormatPDF
+
+            ' Close the temporary document without saving changes
+            tempDoc.Close SaveChanges:=wdDoNotSaveChanges
+        End If
+    Next oRevision
+
+    ' Clean up - release objects
+    Set oDoc = Nothing
+    Set tempDoc = Nothing
+End Sub
+
